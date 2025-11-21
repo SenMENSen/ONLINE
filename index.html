@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <title>Онлайн квадратики</title>
+  <style>
+    body { background:#111; color:#fff; font-family:sans-serif; text-align:center; }
+    canvas { background:#000; border:1px solid #555; display:block; margin:20px auto; }
+  </style>
+</head>
+<body>
+  <h1>Простая онлайн игра</h1>
+  <p>Управление: WASD. Открой эту страницу на двух устройствах — увидите друг друга.</p>
+  <canvas id="game" width="400" height="300"></canvas>
+
+  <script>
+    const canvas = document.getElementById('game');
+    const ctx = canvas.getContext('2d');
+
+    // подключение к WebSocket-серверу
+    const ws = new WebSocket(`ws://${location.host}`);
+
+    // наш игрок
+    const me = {
+      id: Math.random().toString(36).slice(2),
+      x: 50,
+      y: 50,
+      color: 'cyan'
+    };
+
+    // другие игроки
+    const others = {};
+
+    const speed = 3;
+    const keys = {};
+
+    document.addEventListener('keydown', e => keys[e.key.toLowerCase()] = true);
+    document.addEventListener('keyup',   e => keys[e.key.toLowerCase()] = false);
+
+    ws.addEventListener('open', () => {
+      sendState();
+    });
+
+    ws.addEventListener('message', (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === 'state' && data.id !== me.id) {
+          others[data.id] = data;
+        }
+      } catch (e) {}
+    });
+
+    function sendState() {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({
+          type: 'state',
+          id: me.id,
+          x: me.x,
+          y: me.y,
+          color: me.color
+        }));
+      }
+    }
+
+    function update() {
+      if (keys['w']) me.y -= speed;
+      if (keys['s']) me.y += speed;
+      if (keys['a']) me.x -= speed;
+      if (keys['d']) me.x += speed;
+
+      // ограничения по краям
+      me.x = Math.max(0, Math.min(canvas.width - 20, me.x));
+      me.y = Math.max(0, Math.min(canvas.height - 20, me.y));
+
+      sendState();
+    }
+
+    function drawPlayer(p) {
+      ctx.fillStyle = p.color;
+      ctx.fillRect(p.x, p.y, 20, 20);
+    }
+
+    function loop() {
+      update();
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      drawPlayer(me);
+      for (const id in others) {
+        drawPlayer(others[id]);
+      }
+      requestAnimationFrame(loop);
+    }
+
+    loop();
+  </script>
+</body>
+</html>
