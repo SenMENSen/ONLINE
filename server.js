@@ -1,7 +1,6 @@
 const WebSocket = require('ws');
 const http = require('http');
 const fs = require('fs');
-
 const server = http.createServer((req, res) => {
   if (req.url === '/') {
     fs.readFile('./index.html', (err, data) => {
@@ -19,11 +18,11 @@ const server = http.createServer((req, res) => {
 const wss = new WebSocket.Server({ server });
 const clients = new Map();
 
-wss.on('connection', (ws) => {
+wss.on('connection', ws => {
   const id = Math.random().toString(36).substr(2, 9);
   clients.set(ws, { id, snake: [] });
 
-  ws.on('message', (msg) => {
+  ws.on('message', msg => {
     const data = JSON.parse(msg);
     clients.get(ws).snake = data.snake;
     broadcast();
@@ -35,11 +34,13 @@ wss.on('connection', (ws) => {
   });
 
   function broadcast() {
-    const snakes = [];
+    const allSnakes = [];
     clients.forEach(client => {
-      snakes.push({ id: client.id, snake: client.snake });
+      if(client.snake.length) {
+        allSnakes.push({ id: client.id, snake: client.snake });
+      }
     });
-    const msg = JSON.stringify(snakes);
+    const msg = JSON.stringify(allSnakes);
     clients.forEach((_, clientWs) => {
       if (clientWs.readyState === WebSocket.OPEN) {
         clientWs.send(msg);
