@@ -1,73 +1,71 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8" />
-  <title>Простая онлайн игра</title>
-  <style>
-    canvas { background: #222; display: block; margin: auto; }
-  </style>
+<meta charset="UTF-8" />
+<title>Простая онлайн игра</title>
+<style>
+  canvas { background: #222; display: block; margin: auto; }
+</style>
 </head>
 <body>
-  <h1>Двигай квадрат (WASD), видь другого</h1>
-  <canvas id="game" width="400" height="300"></canvas>
-  <script>
-    const ws = new WebSocket(`ws://${location.host}`);
-    const canvas = document.getElementById('game');
-    const ctx = canvas.getContext('2d');
+<h1>Двигай квадрат (WASD), видь другого</h1>
+<canvas id="game" width="400" height="300"></canvas>
+<script>
+const ws = new WebSocket(`ws://${location.host}`);
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
 
-    const player = { x: 50, y: 50, color: 'cyan', id: Math.random().toString(36).slice(2) };
-    const others = {};
+const player = { id: Math.random().toString(36).slice(2), x: 50, y: 50, color: 'cyan' };
+const others = {};
 
-    const keys = {};
-    document.addEventListener('keydown', e => keys[e.key.toLowerCase()] = true);
-    document.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
+const keys = {};
+document.addEventListener('keydown', e => { keys[e.key.toLowerCase()] = true; });
+document.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
 
-    ws.onmessage = (msg) => {
-      const data = JSON.parse(msg.data);
-      if (data.id !== player.id) {
-        others[data.id] = data;
-      }
-    };
+ws.onmessage = (msg) => {
+  const data = JSON.parse(msg.data);
+  if (data.id !== player.id) {
+    others[data.id] = data;
+  }
+};
 
-    function sendPosition() {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify(player));
-      }
-    }
+function sendPosition() {
+  if (ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify(player));
+  }
+}
 
-    function update() {
-      if (keys['w']) player.y -= 3;
-      if (keys['s']) player.y += 3;
-      if (keys['a']) player.x -= 3;
-      if (keys['d']) player.x += 3;
+function update() {
+  if (keys['w']) player.y -= 2;
+  if (keys['s']) player.y += 2;
+  if (keys['a']) player.x -= 2;
+  if (keys['d']) player.x += 2;
 
-      // Ограничение по полю
-      player.x = Math.max(0, Math.min(canvas.width - 20, player.x));
-      player.y = Math.max(0, Math.min(canvas.height - 20, player.y));
+  // Ограничения
+  player.x = Math.max(0, Math.min(canvas.width - 20, player.x));
+  player.y = Math.max(0, Math.min(canvas.height - 20, player.y));
 
-      sendPosition();
-    }
+  sendPosition();
+}
 
-    function draw() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      // Рисуем своих и других
-      ctx.fillStyle = player.color;
-      ctx.fillRect(player.x, player.y, 20, 20);
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = player.color;
+  ctx.fillRect(player.x, player.y, 20, 20);
+  for (const id in others) {
+    const p = others[id];
+    ctx.fillStyle = p.color;
+    ctx.fillRect(p.x, p.y, 20, 20);
+  }
+}
 
-      for (const id in others) {
-        const p = others[id];
-        ctx.fillStyle = p.color || 'red';
-        ctx.fillRect(p.x, p.y, 20, 20);
-      }
-    }
+function loop() {
+  update();
+  draw();
+  requestAnimationFrame(loop);
+}
 
-    function loop() {
-      update();
-      draw();
-      requestAnimationFrame(loop);
-    }
-
-    loop();
-  </script>
+loop();
+</script>
 </body>
 </html>
