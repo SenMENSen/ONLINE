@@ -1,33 +1,31 @@
-// server.js
+const WebSocket = require('ws');
 const http = require('http');
 const fs = require('fs');
-const WebSocket = require('ws');
 
 const server = http.createServer((req, res) => {
-  let path = req.url === '/' ? '/index.html' : req.url;
-  fs.readFile(__dirname + path, (err, data) => {
-    if (err) {
-      res.writeHead(404);
-      res.end('Not found');
-    } else {
+  if (req.url === '/') {
+    fs.readFile('./index.html', (err, data) => {
+      if (err) {
+        res.writeHead(500);
+        res.end('Error loading index.html');
+        return;
+      }
       res.writeHead(200);
       res.end(data);
-    }
-  });
+    });
+  }
 });
 
 const wss = new WebSocket.Server({ server });
+const clients = new Set();
 
-let clients = new Set();
-
-wss.on('connection', (ws) => {
+wss.on('connection', ws => {
   clients.add(ws);
 
-  ws.on('message', (msg) => {
-    // просто пересылаем всем остальным
+  ws.on('message', message => {
     for (let client of clients) {
       if (client !== ws && client.readyState === WebSocket.OPEN) {
-        client.send(msg.toString());
+        client.send(message);
       }
     }
   });
@@ -37,7 +35,5 @@ wss.on('connection', (ws) => {
   });
 });
 
-const PORT = 3000;
-server.listen(PORT, () => {
-  console.log('Server running on http://localhost:' + PORT);
-});
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => console.log(`Server listening on ${PORT}`));
