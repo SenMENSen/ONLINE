@@ -1,82 +1,86 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8" />
-  <title>Онлайн змейка на двоих</title>
-  <style>
-    canvas { background: #222; display: block; margin: 10px auto; }
-    body { text-align: center; color: white; font-family: Arial, sans-serif; background: #000; }
-  </style>
+<meta charset="UTF-8" />
+<title>Онлайн Змейка на двоих</title>
+<style>
+  body { background: #111; color: white; font-family: Arial, sans-serif; text-align: center; margin: 0; }
+  canvas { background: #222; display: block; margin: 10px auto; border: 1px solid #555; }
+</style>
 </head>
 <body>
-  <h1>Управляй змейкой стрелками, видь другую змейку</h1>
-  <canvas id="game" width="400" height="400"></canvas>
-  <script>
-    const canvas = document.getElementById('game');
-    const ctx = canvas.getContext('2d');
-    const gridSize = 20;
-    const ws = new WebSocket(`ws://${location.host}`);
+<h1>Управляй змейкой стрелками. Видь другую змейку.</h1>
+<canvas id="game" width="400" height="400"></canvas>
+<script>
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  const gridSize = 20;
+  const ws = new WebSocket(`ws://${location.host}`);
 
-    let direction = 'right';
-    const snake = [{x:5, y:10}, {x:4, y:10}, {x:3, y:10}];
-    let snakes = [];
+  let direction = 'right';
+  const snake = [{x:5,y:10},{x:4,y:10},{x:3,y:10}];
+  let otherSnakes = [];
 
-    document.addEventListener('keydown', e => {
-      if (e.key === 'ArrowUp' && direction !== 'down') direction = 'up';
-      else if (e.key === 'ArrowDown' && direction !== 'up') direction = 'down';
-      else if (e.key === 'ArrowLeft' && direction !== 'right') direction = 'left';
-      else if (e.key === 'ArrowRight' && direction !== 'left') direction = 'right';
+  ws.onmessage = e => {
+    try {
+      otherSnakes = JSON.parse(e.data).filter(s => s.snake.length);
+    } catch {
+      otherSnakes = [];
+    }
+  };
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowUp' && direction !== 'down') direction = 'up';
+    else if (e.key === 'ArrowDown' && direction !== 'up') direction = 'down';
+    else if (e.key === 'ArrowLeft' && direction !== 'right') direction = 'left';
+    else if (e.key === 'ArrowRight' && direction !== 'left') direction = 'right';
+  });
+
+  function moveSnake() {
+    const head = {...snake[0]};
+    if(direction === 'up') head.y--;
+    else if(direction === 'down') head.y++;
+    else if(direction === 'left') head.x--;
+    else if(direction === 'right') head.x++;
+
+    if(head.x < 0) head.x = (canvas.width / gridSize) - 1;
+    else if(head.x >= canvas.width / gridSize) head.x = 0;
+    if(head.y < 0) head.y = (canvas.height / gridSize) - 1;
+    else if(head.y >= canvas.height / gridSize) head.y = 0;
+
+    snake.unshift(head);
+    snake.pop();
+  }
+
+  function sendSnake() {
+    if(ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({snake}));
+    }
+  }
+
+  function draw() {
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+
+    // Своя змейка зеленая
+    ctx.fillStyle = 'lime';
+    snake.forEach(part => ctx.fillRect(part.x*gridSize, part.y*gridSize, gridSize, gridSize));
+
+    // Другие змейки красные
+    ctx.fillStyle = 'red';
+    otherSnakes.forEach(s => {
+      if(JSON.stringify(s.snake) !== JSON.stringify(snake)) {
+        s.snake.forEach(part => ctx.fillRect(part.x*gridSize, part.y*gridSize, gridSize, gridSize));
+      }
     });
+  }
 
-    ws.onmessage = (event) => {
-      snakes = JSON.parse(event.data).filter(s => s.snake.length > 0);
-    };
+  function gameLoop() {
+    moveSnake();
+    sendSnake();
+    draw();
+  }
 
-    function moveSnake() {
-      const head = {...snake[0]};
-      if (direction === 'up') head.y--;
-      else if (direction === 'down') head.y++;
-      else if (direction === 'left') head.x--;
-      else if (direction === 'right') head.x++;
-
-      if (head.x < 0) head.x = canvas.width / gridSize - 1;
-      else if (head.x >= canvas.width / gridSize) head.x = 0;
-      if (head.y < 0) head.y = canvas.height / gridSize - 1;
-      else if (head.y >= canvas.height / gridSize) head.y = 0;
-
-      snake.unshift(head);
-      snake.pop();
-    }
-
-    function sendState() {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ snake }));
-      }
-    }
-
-    function draw() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = 'lime';
-      for (const s of snake) {
-        ctx.fillRect(s.x * gridSize, s.y * gridSize, gridSize, gridSize);
-      }
-      ctx.fillStyle = 'red';
-      for (const sData of snakes) {
-        if (JSON.stringify(sData.snake) !== JSON.stringify(snake)) {
-          for (const s of sData.snake) {
-            ctx.fillRect(s.x * gridSize, s.y * gridSize, gridSize, gridSize);
-          }
-        }
-      }
-    }
-
-    function gameLoop() {
-      moveSnake();
-      sendState();
-      draw();
-    }
-
-    setInterval(gameLoop, 150);
-  </script>
+  setInterval(gameLoop, 150);
+</script>
 </body>
 </html>
