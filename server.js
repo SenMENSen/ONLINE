@@ -1,25 +1,51 @@
 const WebSocket = require('ws');
 const http = require('http');
-
+const fs = require('fs');
 const server = http.createServer((req, res) => {
   if (req.url === '/') {
-    res.end(fs.readFileSync('index.html'));
+    fs.readFile('./index.html', (err, data) => {
+      if (err) {
+        res.writeHead(500);
+        res.end('Error loading index.html');
+        return;
+      }
+      res.writeHead(200, {'Content-Type': 'text/html'});
+      res.end(data);
+    });
   }
 });
-const wss = new WebSocket.Server({ server });
-const clients = new Set();
 
-wss.on('connection', ws => {
-  clients.add(ws);
-  ws.on('message', message => {
-    for (let client of clients) {
-      if (client !== ws && client.readyState === WebSocket.OPEN) {
-        client.send(message);
-      }
-    }
+const wss = new WebSocket.Server({ server });
+const clients = new Map();
+
+wss.on('connection', (ws) => {
+  const id = Math.random().toString(36).substr(2, 9);
+  clients.set(ws, {id, snake: []});
+
+  ws.on('message', (message) => {
+    const data = JSON.parse(message);
+    clients.get(ws).snake = data.snake;
+    broadcast();
   });
-  ws.on('close', () => { clients.delete(ws); });
+
+  ws.on('close', () => {
+    clients.delete(ws);
+    broadcast();
+  });
+
+  function broadcast() {
+    const snakes = [];
+    clients.forEach(client => {
+      snakes.push({id: client.id, snake: client.snake});
+    });
+    const msg = JSON.stringify(snakes);
+    clients.forEach((_, clientWs) => {
+      if (clientWs.readyState === WebSocket.OPEN) {
+        clientWs.send(msg);
+      }
+    });
+  }
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`Server on ${PORT}`));
+server.listen(PORT, () => console.log(`Server listening on ${PORT}`));
